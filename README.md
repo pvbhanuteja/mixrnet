@@ -1,6 +1,6 @@
 
 
-## MixRNet
+## MixRNet(Using mixup as regularization and tuning hyper-parameters for ResNets)
 Using mixup data augmentation as reguliraztion and tuning the hyper parameters of ResNet 50 models to achieve **94.57%** test accuracy on CIFAR-10 Dataset. Link to preprint (Soon here)
 | **network** | **error %** | 
 |-------------|-------------|
