@@ -3,3 +3,4 @@ preds.npy
 job.slurm
 report.zip
 report/
+.DS_Store

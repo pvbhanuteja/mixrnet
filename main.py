@@ -10,30 +10,34 @@ import torchvision
 import torchvision.transforms as transforms
 import uuid
 import time
-import wandb
 import os
 import argparse
 from dataloader import  CIFAR_Dataset
 from mixup import mixup_cross_entropy_loss
 from models import *
 from utils import progress_bar, get_time_str
+from torch.utils.tensorboard import SummaryWriter
 
-os.environ["WANDB_API_KEY"] = '3bd98dfca3ee43d5b0750b7e7ae85ba3a422d0d2'
+
+
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
 parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
 parser.add_argument('--resume', '-r', action='store_true',
                     help='resume from checkpoint')
 parser.add_argument('--run_name','-rn',type=str, help='your experiment name',default=f'{get_time_str()}_default')
-parser.add_argument('--batch_size', '-b', default=128, type=int, help='batch size')
+parser.add_argument('--batch_size', '-b', default=512, type=int, help='batch size')
 parser.add_argument('--ckp_last', '-cl', default=True, type=bool, help='resume with last checkpoint if false resume with best checkpoint')
 parser.add_argument('--num_epochs', '-ne', default=200, type=int, help='number of epochs')
 
-
+timestamp = get_time_str()
+print(timestamp)
 args = parser.parse_args()
+if args.resume:
+    folder_name = args.run_name
+else:
+    folder_name = f'runs/{args.run_name}/{timestamp}'
+writer = SummaryWriter(folder_name)
 
-
-wandb.init(project=args.run_name, entity="pvbhanuteja")
-wandb.login()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
@@ -65,15 +69,10 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer',
 
 # Model
 print('==> Building model..')
-net = ResNet50PreAct()
+net = ResNet18()
 
 net = net.to(device)
-wandb.watch(net, log_freq=100,log_graph=True)
-wandb.config = {
-  "learning_rate": args.lr,
-  "epochs": 200,
-  "batch_size": args.batch_size
-}
+
 if device == 'cuda':
     net = torch.nn.DataParallel(net)
     cudnn.benchmark = True
@@ -83,14 +82,13 @@ if args.resume:
     print('==> Resuming from checkpoint..')
     assert os.path.isdir(args.run_name), 'Error: no checkpoint directory found!'
     if args.ckp_last:
-        checkpoint = torch.load(f'./{args.run_name}/ckpt_last.pth')
+        checkpoint = torch.load(f'./{args.run_name}/models/ckpt_last.pth')
     else:
-        checkpoint = torch.load(f'./{args.run_name}/ckpt_best.pth')
+        checkpoint = torch.load(f'./{args.run_name}/models/ckpt_best.pth')
     net.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
-else:
-    args.run_name = f'runs/{args.run_name}/{get_time_str()}'
+
 
 
 criterion = nn.CrossEntropyLoss()
@@ -128,9 +126,13 @@ def train(epoch):
 
         progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                      % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
-    wandb.log({"train_loss": train_loss/(batch_idx+1),
-                "train_accuracy":100.*correct/total,
-                "epoch":epoch})
+    writer.add_scalar("Loss/train", train_loss/(batch_idx+1), epoch)
+    writer.add_scalar("Accuracy/train", 100.*correct/total, epoch)
+    for name, weight in net.named_parameters():
+        writer.add_histogram(name,weight, epoch)
+        writer.add_histogram(f'{name}.grad',weight.grad, epoch)
+
+
     if (epoch+1)%10 == 0:
         print('Saving model..')
         state = {
@@ -138,9 +140,9 @@ def train(epoch):
             'acc': 100.*correct/total,
             'epoch': epoch,
         }
-        if not os.path.isdir(args.run_name):
-            os.makedirs(args.run_name)
-        torch.save(state, f'./{args.run_name}/ckpt_last.pth')
+        if not os.path.isdir(f'./{folder_name}/models'):
+            os.makedirs(f'./{folder_name}/models')
+        torch.save(state, f'./{folder_name}/models/ckpt_last.pth')
 
 
 def test(epoch):
@@ -164,9 +166,8 @@ def test(epoch):
                          % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
     # Save checkpoint.
     acc = 100.*correct/total
-    wandb.log({"test_loss": test_loss/(batch_idx+1),
-            "test_accuracy":acc,
-            "epoch":epoch})
+    writer.add_scalar("Loss/test", test_loss/(batch_idx+1), epoch)
+    writer.add_scalar("Accuracy/test", acc, epoch)
     if acc > best_acc:
         print('Saving best model..')
         state = {
@@ -174,9 +175,9 @@ def test(epoch):
             'acc': acc,
             'epoch': epoch,
         }
-        if not os.path.isdir(args.run_name):
-            os.makedirs(args.run_name)
-        torch.save(state, f'./{args.run_name}/ckpt_best.pth')
+        if not os.path.isdir(f'./{folder_name}/models'):
+            os.makedirs(f'./{folder_name}/models')
+        torch.save(state, f'./{folder_name}/models/ckpt_best.pth')
         best_acc = acc
 
 if __name__ == "__main__":
@@ -184,3 +185,9 @@ if __name__ == "__main__":
         train(epoch)
         test(epoch)
         scheduler.step()
+    writer.add_hparams(
+        {"lr": args.lr, "bsize": args.batch_size},
+        {
+            "accuracy": best_acc
+        },
+    )

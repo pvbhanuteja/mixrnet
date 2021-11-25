@@ -18,7 +18,7 @@ def get_time_str():
     # convert to datetime
     date_time = datetime.fromtimestamp(ts)
     # convert timestamp to string in dd-mm-yyyy HH:MM:SS
-    str_date_time = date_time.strftime("%d-%m-%Y-%H:%M:%S")
+    str_date_time = date_time.strftime("%d-%m-%Y-%H:%M")
     return(str_date_time)
 
 def get_mean_and_std(dataset):
