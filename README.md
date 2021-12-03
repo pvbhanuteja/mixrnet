@@ -71,3 +71,8 @@ python pred.py (Provide path of the saved models)
 - dataloader.py is a torch class based dataloader of our train data (CIFAR-10 data)
 - private_loader.py is a torch class based dataloader of our private data.
 - Transformations are done using torchtransforms in main.py and sweep.py files depending on usage.
+
+## Under-Development
+
+- Addind tensorbaord implementation under new branch
+- Hyper-parameters sweep and distributed training using ray.io
