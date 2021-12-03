@@ -8,7 +8,7 @@ Using mixup data augmentation as reguliraztion and tuning the hyper parameters o
 | resnet-110  | 6.61        |
 | resnet-164  | 5.93        |
 | resnet-1001 | 7.61        |
-| **This method** | **5.43** |
+| **This method** | **4.87** |
 
 
 #### Overview
